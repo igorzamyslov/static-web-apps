@@ -1,0 +1,27 @@
+name: Quality checks
+description: Install shared tooling, lint, check formatting, and build every app.
+runs:
+  using: composite
+  steps:
+    - name: Setup Node
+      uses: actions/setup-node@v5
+      with:
+        node-version-file: .nvmrc
+        cache: npm
+        cache-dependency-path: "**/package-lock.json"
+
+    - name: Install shared tooling
+      shell: bash
+      run: npm ci
+
+    - name: Lint (JS/TS, CSS, HTML)
+      shell: bash
+      run: npm run lint
+
+    - name: Check formatting
+      shell: bash
+      run: npm run format:check
+
+    - name: Build every app (type-checks + builds)
+      shell: bash
+      run: npm run build:all

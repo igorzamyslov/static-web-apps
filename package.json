@@ -1,0 +1,53 @@
+{
+  "name": "static-web-apps",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Monorepo of independent static web apps, each deployed to GitHub Pages.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "lint": "npm run lint:js && npm run lint:css && npm run lint:html",
+    "lint:js": "eslint .",
+    "lint:css": "stylelint \"apps/**/*.css\"",
+    "lint:html": "html-validate \"apps/*/index.html\"",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "build:all": "node scripts/build-all.mjs",
+    "verify": "npm run lint && npm run format:check && npm run build:all",
+    "new-app": "bash scripts/new-app.sh",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.css": [
+      "stylelint --fix",
+      "prettier --write"
+    ],
+    "*.html": [
+      "html-validate",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.7.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.7.0",
+    "html-validate": "^11.5.6",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.8",
+    "prettier": "^3.9.5",
+    "stylelint": "^17.14.0",
+    "stylelint-config-standard": "^40.0.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.64.0"
+  }
+}

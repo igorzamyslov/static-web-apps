@@ -1,0 +1,82 @@
+:root {
+  color-scheme: light dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font:
+    16px/1.6 system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  background: Canvas;
+  color: CanvasText;
+}
+
+main {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem;
+}
+
+h1 {
+  margin: 0 0 0.25rem;
+}
+
+.hint {
+  margin: 0 0 1.5rem;
+  opacity: 0.7;
+}
+
+.panes {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (width <= 720px) {
+  .panes {
+    grid-template-columns: 1fr;
+  }
+}
+
+#input,
+.output {
+  min-height: 60vh;
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+  border-radius: 10px;
+}
+
+#input {
+  width: 100%;
+  resize: vertical;
+  font:
+    14px/1.5 ui-monospace,
+    "SF Mono",
+    Menlo,
+    Consolas,
+    monospace;
+  background: color-mix(in srgb, Canvas 92%, CanvasText);
+  color: CanvasText;
+}
+
+.output :first-child {
+  margin-top: 0;
+}
+
+.output pre {
+  overflow-x: auto;
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, Canvas 88%, CanvasText);
+}
+
+a {
+  color: LinkText;
+}

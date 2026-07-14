@@ -1,107 +1,199 @@
 # static-web-apps
 
-One repository, many static web apps, all published to GitHub Pages. On every
-push to `main`, **only the apps that changed are rebuilt and republished** —
-untouched apps are left exactly as they are on the live site.
+One repository, many **independent** static web apps, all published to GitHub
+Pages. Each app builds, runs, and deploys on its own, and shares one strict set
+of quality tools. On every push to `main`, **only the apps that changed are
+rebuilt and republished** — untouched apps are left exactly as they are on the
+live site.
+
+- **Live site:** https://igorzamyslov.github.io/static-web-apps/
+- **Contributor guide:** [CONTRIBUTING.md](CONTRIBUTING.md)
+
+## Contents
+
+- [Layout](#layout)
+- [Quick start](#quick-start)
+- [The two kinds of app](#the-two-kinds-of-app)
+- [Adding an app](#adding-an-app)
+- [App conventions](#app-conventions)
+- [Quality tooling](#quality-tooling)
+- [How CI/CD works](#how-cicd-works)
+- [Deployment model](#deployment-model)
+- [Troubleshooting & caveats](#troubleshooting--caveats)
 
 ## Layout
 
 ```
 apps/
-  hello/            # plain static app (no build) — folder is published as-is
-    app.json        #   optional metadata for the landing page
+  hello/                 # pure static app — plain HTML/CSS, no build
+    app.json             #   optional landing-page metadata
     index.html
     styles.css
-  clock/            # built app — `npm run build` outputs to dist/
+    README.md
+  markdown-preview/      # built app — Vite + TypeScript + npm deps
     app.json
-    package.json    #   presence of package.json => this app has a build step
-    build.mjs
+    package.json         #   presence of package.json => this app has a build
+    index.html
+    vite.config.ts
+    tsconfig.json        #   extends ../../tsconfig.base.json
     src/
+    README.md
 scripts/
-  build-app.mjs     # builds one app into an output dir
-  generate-index.mjs# regenerates the landing page that links to every app
-  new-app.sh        # scaffolds a new app
-.github/workflows/
-  deploy.yml        # change detection + incremental publish to gh-pages
+  build-app.mjs          # build ONE app into an output dir
+  build-all.mjs          # build EVERY app (used by the quality gate)
+  generate-index.mjs     # regenerate the landing page from apps/*
+  new-app.sh             # scaffold a new static app
+.github/
+  actions/quality/       # composite action: install + lint + format + build all
+  workflows/
+    ci.yml               # quality gate on pull requests
+    deploy.yml           # quality gate + incremental publish on push to main
+eslint.config.mjs        # strict ESLint (flat config)
+.prettierrc.json         # formatting
+.stylelintrc.json        # CSS linting
+.htmlvalidate.json       # HTML validation
+tsconfig.base.json       # strict TypeScript base for all built apps
+.editorconfig  .nvmrc    # editor + Node version consistency
 ```
 
 Each app is served at `https://<user>.github.io/<repo>/<app-name>/`, and the
-repo root (`https://<user>.github.io/<repo>/`) is an auto-generated landing page
-linking to all apps.
+repo root is an auto-generated landing page linking to every app.
 
-## One-time setup
+## Quick start
 
-1. Push this repo to GitHub with the default branch named `main`.
-2. Let the workflow run once (it creates the `gh-pages` branch).
-3. In **Settings → Pages → Build and deployment**, set **Source** to
-   **Deploy from a branch**, and choose branch **`gh-pages`** / **`/ (root)`**.
-4. Your site goes live at `https://<user>.github.io/<repo>/`.
+```bash
+git clone https://github.com/igorzamyslov/static-web-apps
+cd static-web-apps
+npm install            # installs the shared quality tools (+ git hooks)
+
+# work on a specific app (see each app's README)
+npx serve apps/hello                          # pure static app
+cd apps/markdown-preview && npm install && npm run dev   # built app
+
+# repo-wide quality checks (what CI runs)
+npm run verify         # lint + format check + build every app
+npm run format         # auto-format everything
+```
+
+Requires the Node version in [`.nvmrc`](.nvmrc) (`nvm use` picks it up).
+
+## The two kinds of app
+
+An app is detected by whether it has a `package.json`:
+
+|                  | **Pure static** (`hello`)           | **Built** (`markdown-preview`)           |
+| ---------------- | ----------------------------------- | ---------------------------------------- |
+| `package.json`   | none                                | yes, with a `build` script               |
+| Tooling          | none                                | Vite + TypeScript + deps (e.g. `marked`) |
+| What's built     | nothing                             | `npm run build` → `dist/`                |
+| What's published | the folder as-is (minus `app.json`) | the contents of `dist/`                  |
+| Dev              | `npx serve apps/hello`              | `npm run dev` inside the app             |
+
+Both are fully self-contained: you can develop, build, and run either one
+without touching the others.
 
 ## Adding an app
 
-**Plain static app** (HTML/CSS/JS, no tooling):
+**Pure static:**
 
 ```bash
-scripts/new-app.sh my-app
-# edit apps/my-app/…, commit, push
+npm run new-app my-app     # or: bash scripts/new-app.sh my-app
+# edit apps/my-app/, then commit & push
 ```
 
-**Built app** (Vite, React, esbuild, …): create `apps/my-app/` with a
-`package.json` whose `build` script writes the finished site to `dist/`. The
-`clock` app is a working, dependency-free example of this.
+**Built (with dependencies):** create `apps/my-app/` with a `package.json` whose
+`build` script writes the finished site to `dist/`. Use `markdown-preview` as a
+template — copy it, then:
+
+```bash
+cd apps/my-app && npm install
+npm run dev
+```
 
 Optionally add `apps/my-app/app.json` (`{ "title", "description" }`) to control
-how the app appears on the landing page.
+the landing-page card.
 
-### Important: use relative paths
+## App conventions
 
-Apps live under a subpath (`/<repo>/<app>/`), so reference assets **relatively**
-(`./styles.css`, `./clock.js`) — never `/styles.css`. For frameworks, set the
-base path accordingly, e.g. Vite:
+1. **Relative asset paths.** Apps live under a subpath (`/<repo>/<app>/`), so
+   reference assets relatively (`./styles.css`), never `/styles.css`. For Vite,
+   set `base: "./"` (see [`vite.config.ts`](apps/markdown-preview/vite.config.ts)).
+2. **Built apps output to `dist/`.** That directory is what gets published.
+3. **`app.json` is metadata only** — it feeds the landing page and is never
+   published inside the app.
+4. **Extend the shared TS config.** Built TypeScript apps extend
+   [`tsconfig.base.json`](tsconfig.base.json) so strictness is uniform.
 
-```js
-// apps/my-app/vite.config.js
-export default { base: "./" };
-```
+## Quality tooling
 
-## How change detection works
+All quality tools live at the repo root and run across every app from a single
+`npm install`.
 
-`deploy.yml`:
+| Tool              | Scope                  | Command             |
+| ----------------- | ---------------------- | ------------------- |
+| **ESLint**        | `.js` / `.mjs` / `.ts` | `npm run lint:js`   |
+| **Stylelint**     | `apps/**/*.css`        | `npm run lint:css`  |
+| **html-validate** | `apps/*/index.html`    | `npm run lint:html` |
+| **Prettier**      | everything             | `npm run format`    |
+| **TypeScript**    | per built app (`tsc`)  | run via each build  |
 
-1. Diffs the pushed commit against the previous one and collects the top-level
-   `apps/<name>` directories that changed.
-2. Builds only those apps (`scripts/build-app.mjs`).
-3. Clones the existing `gh-pages` branch, replaces **only** the changed apps'
-   folders, regenerates the landing page, and pushes. Unchanged apps are never
-   touched.
+- `npm run lint` runs all three linters; `npm run verify` runs lint + format
+  check + a full build of every app.
+- ESLint uses a **strict** flat config (`@eslint/js` recommended +
+  `typescript-eslint` strict & stylistic + extra rules like `eqeqeq`,
+  `no-var`, `prefer-const`, `curly`). Prettier owns formatting, so ESLint's
+  stylistic rules are disabled via `eslint-config-prettier`.
+- TypeScript strictness (`strict`, `noUncheckedIndexedAccess`, `noUnusedLocals`,
+  …) is defined once in `tsconfig.base.json`. Each built app type-checks during
+  its `build` (`tsc --noEmit && vite build`).
+- **Pre-commit hook** (Husky + lint-staged): staged files are auto-fixed and
+  formatted before every commit. Installed automatically by `npm install`.
 
-Everything is rebuilt when: it's the first deploy, the `gh-pages` branch is
-missing, history is unavailable (force push), or you trigger the workflow
+## How CI/CD works
+
+Both workflows share one composite action,
+[`.github/actions/quality`](.github/actions/quality/action.yml), which installs
+tooling, lints, checks formatting, and builds **every** app.
+
+- **[`ci.yml`](.github/workflows/ci.yml)** — runs the quality gate on every pull
+  request (and on pushes to non-`main` branches).
+- **[`deploy.yml`](.github/workflows/deploy.yml)** — on push to `main`, runs the
+  quality gate first; only if it passes does the deploy job run. A broken app
+  never reaches production.
+
+The deploy job then:
+
+1. Diffs the push against the previous commit to find changed `apps/<name>`
+   dirs (filtered to ones that still exist).
+2. Builds **only** those apps.
+3. Clones the live `gh-pages` branch, replaces only the changed apps, **prunes**
+   any app directories no longer in the repo, regenerates the landing page, and
+   pushes.
+
+Everything is rebuilt when it's the first deploy, when `gh-pages` is missing,
+when history is unavailable (force push), or when you trigger the workflow
 manually with **Run workflow → rebuild_all**.
 
-## Local development
+## Deployment model
 
-```bash
-# plain static app — serve the folder
-npx serve apps/hello
+- Uses the **"Deploy from a branch"** Pages source (branch `gh-pages`, `/root`)
+  rather than the Actions-artifact source — because the artifact source
+  redeploys the _entire_ site atomically, which can't express "republish only
+  the app that changed."
+- One-time setup: **Settings → Pages → Source → Deploy from a branch →
+  `gh-pages` / `(root)`** (already configured for this repo).
+- Publishing uses the built-in `GITHUB_TOKEN`; there are no secrets to
+  configure. If you add branch protection to `gh-pages`, exempt the Actions bot.
 
-# built app — run its build, then serve dist/
-cd apps/clock && npm install && npm run build && npx serve dist
+## Troubleshooting & caveats
 
-# preview the whole published site locally
-for a in apps/*/; do node scripts/build-app.mjs "$(basename "$a")" "_site/$(basename "$a")"; done
-node scripts/generate-index.mjs _site
-npx serve _site
-```
-
-## Caveats
-
-- **Deleting an app** removes it from the landing page immediately, but its
-  already-published files remain on the `gh-pages` branch (the incremental
-  deploy only adds/replaces). To fully clean up, delete the app's folder on the
-  `gh-pages` branch, or delete the whole branch and re-run the workflow with
-  `rebuild_all`.
-- Publishing uses the built-in `GITHUB_TOKEN`; no secrets to configure.
-- This uses the **"Deploy from a branch"** Pages source (rather than the
-  Actions artifact source) precisely because it allows publishing one app
-  without redeploying the entire site.
+- **An app 404s after deploy** → check its asset paths are relative and (for
+  Vite) that `base: "./"` is set.
+- **Deleting an app** removes it from the landing page and prunes its published
+  folder on the next deploy. (Files at the site root, e.g. a `CNAME`, are never
+  pruned.)
+- **Reset the whole site** → delete the `gh-pages` branch and re-run the deploy
+  workflow with `rebuild_all`.
+- **Verifying all apps on every deploy** is intentional (it catches a shared
+  config change breaking an untouched app). For very many apps, scope the
+  quality build to changed apps in `.github/actions/quality`.

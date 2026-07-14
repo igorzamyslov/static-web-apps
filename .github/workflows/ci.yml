@@ -1,0 +1,17 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    # Pushes to main are covered by the deploy workflow's quality gate.
+    branches-ignore: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/quality

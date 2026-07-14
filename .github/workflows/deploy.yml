@@ -10,7 +10,7 @@ on:
         type: boolean
         default: false
 
-# The workflow pushes the built site to the gh-pages branch.
+# The deploy job pushes the built site to the gh-pages branch.
 permissions:
   contents: write
 
@@ -20,7 +20,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Quality gate: a broken app never reaches production.
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/quality
+
   deploy:
+    needs: quality
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -31,7 +39,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version-file: .nvmrc
 
       - name: Determine which apps changed
         id: detect
@@ -49,15 +57,12 @@ jobs:
           }
 
           build_all=false
-          # Manual "rebuild everything" request.
           if [ "${REBUILD_ALL:-false}" = "true" ]; then
             build_all=true
           fi
-          # First deploy: nothing published yet -> build everything.
           if ! git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
             build_all=true
           fi
-          # Unknown/invalid base commit (first push, force push) -> build everything.
           if [ "$build_all" = false ]; then
             if [ -z "${BEFORE:-}" ] \
               || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
@@ -68,17 +73,25 @@ jobs:
 
           if [ "$build_all" = true ]; then
             echo "Change detection skipped — publishing all apps."
-            changed=$(all_apps)
+            candidates=$(all_apps)
           else
-            changed=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" -- 'apps/' \
+            candidates=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" -- 'apps/' \
               | awk -F/ 'NF>1 {print $2}' | sort -u)
           fi
 
-          changed=$(echo "$changed" | sed '/^$/d')
-          echo "Apps to publish:"
+          # Keep only apps that still exist (deletions are handled by pruning).
+          changed=""
+          while IFS= read -r app; do
+            [ -n "$app" ] || continue
+            if [ -d "apps/$app" ]; then
+              changed="${changed}${app}"$'\n'
+            fi
+          done <<< "$candidates"
+          changed=$(printf "%s" "$changed" | sed '/^$/d')
+
+          echo "Apps to build & publish:"
           echo "$changed" | sed 's/^/  - /'
 
-          # Expose as a newline-separated list for later steps.
           {
             echo "apps<<EOF"
             echo "$changed"
@@ -99,8 +112,9 @@ jobs:
             echo "::endgroup::"
           done <<< "$APPS"
 
+      # Publish even when no apps changed: deletions still need pruning and the
+      # landing page may need refreshing.
       - name: Publish to gh-pages
-        if: steps.detect.outputs.apps != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPS: ${{ steps.detect.outputs.apps }}
@@ -128,6 +142,17 @@ jobs:
             mkdir -p "$SITE/$app"
             cp -R "_build/$app/." "$SITE/$app/"
           done <<< "$APPS"
+
+          # Prune published directories for apps that no longer exist in the repo.
+          # Only directories are pruned — files like CNAME or 404.html are kept.
+          for d in "$SITE"/*/; do
+            [ -d "$d" ] || continue
+            name=$(basename "$d")
+            if [ ! -d "apps/$name" ]; then
+              echo "Removing deleted app: $name"
+              rm -rf "$d"
+            fi
+          done
 
           # Refresh the landing page (full current app list) and disable Jekyll.
           node scripts/generate-index.mjs "$SITE"
