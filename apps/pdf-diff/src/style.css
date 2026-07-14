@@ -1,0 +1,392 @@
+:root {
+  color-scheme: light dark;
+
+  --accent: #4f7cff;
+  --added: #1a7f37;
+  --removed: #cf222e;
+  --changed: #bf8700;
+  --line: color-mix(in srgb, CanvasText 18%, transparent);
+  --panel: color-mix(in srgb, Canvas 94%, CanvasText);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font:
+    15px/1.55 system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  background: Canvas;
+  color: CanvasText;
+}
+
+#app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 3rem;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.tagline {
+  margin: 0.25rem 0 1.5rem;
+  opacity: 0.7;
+}
+
+a {
+  color: LinkText;
+}
+
+/* ---- Loader ---- */
+
+.dropzones {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (width <= 640px) {
+  .dropzones {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: center;
+  justify-content: center;
+  min-height: 130px;
+  padding: 1.25rem;
+  text-align: center;
+  cursor: pointer;
+  border: 2px dashed var(--line);
+  border-radius: 12px;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.dropzone:hover,
+.dropzone.dragging {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.dropzone.filled {
+  border-style: solid;
+  border-color: var(--accent);
+}
+
+.dz-role {
+  font-weight: 600;
+}
+
+.dz-hint {
+  font-size: 0.9rem;
+  opacity: 0.7;
+  overflow-wrap: anywhere;
+}
+
+.loader-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.status {
+  min-height: 1.2em;
+  color: var(--removed);
+}
+
+/* ---- Buttons ---- */
+
+button {
+  font: inherit;
+}
+
+#compare {
+  padding: 0.5rem 1.25rem;
+  color: white;
+  cursor: pointer;
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+}
+
+#compare:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.link {
+  padding: 0.5rem 0.25rem;
+  color: var(--accent);
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+
+/* ---- Toolbar ---- */
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.progress {
+  flex: 1 1 220px;
+}
+
+.progress-track {
+  height: 8px;
+  overflow: hidden;
+  background: var(--line);
+  border-radius: 999px;
+}
+
+.progress-fill {
+  width: 0%;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s;
+}
+
+.progress-fill.complete {
+  background: var(--added);
+}
+
+.progress-text {
+  display: inline-block;
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.seg {
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+
+.seg.active {
+  color: white;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ---- Workspace ---- */
+
+.workspace {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (width <= 720px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 75vh;
+  overflow-y: auto;
+}
+
+.page-item {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+  cursor: pointer;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 7px;
+}
+
+.page-item:hover {
+  background: var(--panel);
+}
+
+.page-item.current {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.page-item.status-unchanged {
+  opacity: 0.5;
+}
+
+.page-item.reviewed .pi-label {
+  color: var(--added);
+}
+
+.pi-badge {
+  font-size: 0.72rem;
+  opacity: 0.75;
+}
+
+/* ---- Page header ---- */
+
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.page-title {
+  font-weight: 600;
+}
+
+.badge {
+  padding: 0.1rem 0.5rem;
+  margin-left: 0.5rem;
+  font-size: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.badge.status-added {
+  color: var(--added);
+  border-color: var(--added);
+}
+
+.badge.status-removed {
+  color: var(--removed);
+  border-color: var(--removed);
+}
+
+.badge.status-modified {
+  color: var(--changed);
+  border-color: var(--changed);
+}
+
+.reviewed-toggle {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  cursor: pointer;
+}
+
+/* ---- Viewer ---- */
+
+.viewer {
+  min-height: 300px;
+  padding: 1rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.viewer.side {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (width <= 720px) {
+  .viewer.side {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pane {
+  margin: 0;
+}
+
+.pane figcaption {
+  margin-bottom: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+.pane canvas {
+  width: 100%;
+  height: auto;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.pane-empty {
+  display: grid;
+  place-items: center;
+  height: 200px;
+  color: CanvasText;
+  background: color-mix(in srgb, Canvas 85%, CanvasText);
+  border-radius: 4px;
+  opacity: 0.6;
+}
+
+.text-diff {
+  font:
+    14px/1.7 ui-monospace,
+    "SF Mono",
+    Menlo,
+    Consolas,
+    monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.text-diff ins {
+  text-decoration: none;
+  background: color-mix(in srgb, var(--added) 22%, transparent);
+}
+
+.text-diff del {
+  text-decoration: line-through;
+  background: color-mix(in srgb, var(--removed) 22%, transparent);
+}
+
+.plain {
+  white-space: pre-wrap;
+  opacity: 0.8;
+}
+
+.note {
+  margin: 0.25rem 0;
+  opacity: 0.7;
+}
+
+.nav-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1rem;
+}
+
+.nav-buttons button {
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
