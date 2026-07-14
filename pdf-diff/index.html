@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PDF Diff Review</title>
+    <script type="module" crossorigin src="./assets/index-BmAuJPth.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DbkRZPF2.css">
+  </head>
+  <body>
+    <main id="app">
+      <header class="app-header">
+        <h1>PDF Diff Review</h1>
+        <p class="tagline">Compare two PDFs, see exactly what changed, and track your review.</p>
+      </header>
+
+      <section id="loader" class="loader">
+        <div class="dropzones">
+          <label class="dropzone" id="drop-old">
+            <span class="dz-role">Original</span>
+            <span class="dz-hint" id="name-old">Drop a PDF here or click to choose</span>
+            <input type="file" id="file-old" accept="application/pdf" hidden />
+          </label>
+          <label class="dropzone" id="drop-new">
+            <span class="dz-role">Revised</span>
+            <span class="dz-hint" id="name-new">Drop a PDF here or click to choose</span>
+            <input type="file" id="file-new" accept="application/pdf" hidden />
+          </label>
+        </div>
+        <div class="loader-actions">
+          <button type="button" id="compare" disabled>Compare</button>
+          <button type="button" id="load-example" class="link">Load example</button>
+        </div>
+        <p id="status" class="status" role="status"></p>
+        <p><a href="../">&larr; All apps</a></p>
+      </section>
+
+      <section id="review" class="review" hidden>
+        <div class="toolbar">
+          <div class="progress">
+            <div class="progress-track"><div id="progress-bar" class="progress-fill"></div></div>
+            <span id="progress-text" class="progress-text"></span>
+          </div>
+          <div class="modes" role="group" aria-label="View mode">
+            <button type="button" id="mode-text" class="seg active">Text</button>
+            <button type="button" id="mode-visual" class="seg">Visual</button>
+          </div>
+          <div class="visual-views" id="visual-views" role="group" aria-label="Visual view" hidden>
+            <button type="button" id="view-side" class="seg active">Side by side</button>
+            <button type="button" id="view-diff" class="seg">Difference</button>
+          </div>
+          <button type="button" id="reset" class="link">Start over</button>
+        </div>
+
+        <div class="workspace">
+          <nav id="sidebar" class="sidebar" aria-label="Pages"></nav>
+          <div class="pane-main">
+            <div class="page-header">
+              <div class="page-header-left">
+                <span id="page-title" class="page-title"></span>
+                <span id="page-status" class="badge"></span>
+              </div>
+              <label class="reviewed-toggle">
+                <input type="checkbox" id="reviewed-checkbox" />
+                <span>Reviewed</span>
+              </label>
+            </div>
+            <div id="viewer" class="viewer"></div>
+            <div class="nav-buttons">
+              <button type="button" id="prev">&larr; Previous change</button>
+              <button type="button" id="next">Next change &rarr;</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
