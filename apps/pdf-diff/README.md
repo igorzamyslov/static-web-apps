@@ -4,9 +4,8 @@ A client-side **PDF diff review tool**. Load two PDFs and review what changed �
 in text or visual mode — while tracking which changes you've already checked.
 
 Built app: **Vite + TypeScript** with [`pdf.js`](https://mozilla.github.io/pdf.js/)
-(parse/render), [`diff`](https://www.npmjs.com/package/diff) (text diff), and
-[`pixelmatch`](https://www.npmjs.com/package/pixelmatch) (visual diff). Everything
-runs in the browser — no files are uploaded anywhere.
+(parse/render) and [`diff`](https://www.npmjs.com/package/diff) (text diff).
+Everything runs in the browser — no files are uploaded anywhere.
 
 ```bash
 cd apps/pdf-diff
@@ -18,13 +17,17 @@ npm run build      # tsc --noEmit && vite build → dist/
 ## How it works
 
 - **Text mode** — word-level diff per page (green = added, red = removed).
-- **Visual mode** — renders each page; _Side by side_ shows Original vs Revised,
-  _Difference_ highlights changed pixels.
-- **Review tracking** — mark each changed page **Reviewed**; a progress bar shows
-  how far you are. Progress is saved in `localStorage` per file pair, so
-  reopening the same two PDFs restores it.
-- **Keyboard** — `←/→` (or `j/k`) move between changes, `r` toggles reviewed,
-  `t`/`v` switch modes.
+- **Visual mode** — always shows both pages (Original | Revised), **zoomable**,
+  with the **changed regions boxed** on both. When a page has many changes, step
+  through them one at a time with the diff navigator ("Diff 3 / 12" · prev/next ·
+  click a box to jump); viewed diffs are dimmed so you can work through them.
+- **Review tracking** — text and visual are tracked **separately** (reviewing the
+  text diff doesn't mark the visual diff checked, and vice versa). Each page shows
+  `T`/`V` ticks; the progress bar counts both. Saved in `localStorage` per file
+  pair, so reopening the same two PDFs restores it.
+- **Keyboard** — `←/→` move between changed pages, `[` / `]` step diffs within a
+  page, `+` / `-` / `0` zoom, `r` toggles reviewed (current mode), `t`/`v` switch
+  modes.
 
 Click **Load example** to try it with bundled sample PDFs.
 
