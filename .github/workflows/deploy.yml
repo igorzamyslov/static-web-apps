@@ -1,0 +1,143 @@
+name: Deploy static web apps
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      rebuild_all:
+        description: "Rebuild and publish every app (ignore change detection)"
+        type: boolean
+        default: false
+
+# The workflow pushes the built site to the gh-pages branch.
+permissions:
+  contents: write
+
+# Never run two deploys at once — they would race on the gh-pages branch.
+concurrency:
+  group: deploy-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so we can diff against the previous commit
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Determine which apps changed
+        id: detect
+        env:
+          BEFORE: ${{ github.event.before }}
+          REBUILD_ALL: ${{ github.event.inputs.rebuild_all }}
+        run: |
+          set -euo pipefail
+
+          all_apps() {
+            for d in apps/*/; do
+              [ -d "$d" ] || continue
+              basename "$d"
+            done
+          }
+
+          build_all=false
+          # Manual "rebuild everything" request.
+          if [ "${REBUILD_ALL:-false}" = "true" ]; then
+            build_all=true
+          fi
+          # First deploy: nothing published yet -> build everything.
+          if ! git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            build_all=true
+          fi
+          # Unknown/invalid base commit (first push, force push) -> build everything.
+          if [ "$build_all" = false ]; then
+            if [ -z "${BEFORE:-}" ] \
+              || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
+              || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+              build_all=true
+            fi
+          fi
+
+          if [ "$build_all" = true ]; then
+            echo "Change detection skipped — publishing all apps."
+            changed=$(all_apps)
+          else
+            changed=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" -- 'apps/' \
+              | awk -F/ 'NF>1 {print $2}' | sort -u)
+          fi
+
+          changed=$(echo "$changed" | sed '/^$/d')
+          echo "Apps to publish:"
+          echo "$changed" | sed 's/^/  - /'
+
+          # Expose as a newline-separated list for later steps.
+          {
+            echo "apps<<EOF"
+            echo "$changed"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build changed apps
+        if: steps.detect.outputs.apps != ''
+        env:
+          APPS: ${{ steps.detect.outputs.apps }}
+        run: |
+          set -euo pipefail
+          rm -rf _build
+          while IFS= read -r app; do
+            [ -n "$app" ] || continue
+            echo "::group::Building $app"
+            node scripts/build-app.mjs "$app" "_build/$app"
+            echo "::endgroup::"
+          done <<< "$APPS"
+
+      - name: Publish to gh-pages
+        if: steps.detect.outputs.apps != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPS: ${{ steps.detect.outputs.apps }}
+        run: |
+          set -euo pipefail
+          SITE="$RUNNER_TEMP/site"
+          rm -rf "$SITE"
+
+          # Start from the currently published site so untouched apps are preserved.
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            git clone --depth 1 --branch gh-pages \
+              "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$SITE"
+          else
+            mkdir -p "$SITE"
+            git -C "$SITE" init -q
+            git -C "$SITE" checkout -q -b gh-pages
+          fi
+
+          # Replace only the apps that changed; everything else stays as published.
+          while IFS= read -r app; do
+            [ -n "$app" ] || continue
+            rm -rf "${SITE:?}/$app"
+            mkdir -p "$SITE/$app"
+            cp -R "_build/$app/." "$SITE/$app/"
+          done <<< "$APPS"
+
+          # Refresh the landing page (full current app list) and disable Jekyll.
+          node scripts/generate-index.mjs "$SITE"
+          touch "$SITE/.nojekyll"
+
+          cd "$SITE"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nothing new to publish."
+          else
+            git commit -q -m "Publish ${GITHUB_SHA:0:7}"
+            git push -q origin gh-pages
+          fi
