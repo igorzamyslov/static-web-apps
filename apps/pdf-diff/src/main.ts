@@ -1,17 +1,15 @@
 import { loadPdf, renderPage, type LoadedPdf } from "./pdf";
 import {
   buildPageDiffs,
-  computeVisualDiff,
+  computeDiffRegions,
   renderTextDiff,
+  type DiffRegions,
   type PageDiff,
   type PageStatus,
-  type VisualDiff,
 } from "./diff";
-import { loadReviewed, saveReviewed, storageKey } from "./review";
+import { loadReview, saveReview, storageKey, type ReviewMode, type ReviewSets } from "./review";
+import { createVisual, type VisualController } from "./visual";
 import "./style.css";
-
-type Mode = "text" | "visual";
-type VisualView = "side" | "diff";
 
 interface Source {
   name: string;
@@ -25,15 +23,15 @@ interface Session {
   pages: PageDiff[];
   changed: number[];
   key: string;
-  reviewed: Set<number>;
+  reviewed: ReviewSets;
   current: number;
-  mode: Mode;
-  visualView: VisualView;
+  mode: ReviewMode;
   canvasCache: Map<string, HTMLCanvasElement | null>;
-  diffCache: Map<number, VisualDiff>;
+  regionCache: Map<number, DiffRegions>;
+  visual: VisualController | null;
 }
 
-const TARGET_WIDTH = 820;
+const RENDER_WIDTH = 1000;
 
 const STATUS_LABEL: Record<PageStatus, string> = {
   added: "Added",
@@ -70,13 +68,12 @@ const progressBar = requireEl<HTMLElement>("#progress-bar");
 const progressText = requireEl<HTMLElement>("#progress-text");
 const modeTextBtn = requireEl<HTMLButtonElement>("#mode-text");
 const modeVisualBtn = requireEl<HTMLButtonElement>("#mode-visual");
-const visualViewsEl = requireEl<HTMLElement>("#visual-views");
-const viewSideBtn = requireEl<HTMLButtonElement>("#view-side");
-const viewDiffBtn = requireEl<HTMLButtonElement>("#view-diff");
 const resetBtn = requireEl<HTMLButtonElement>("#reset");
 const pageTitle = requireEl<HTMLElement>("#page-title");
 const pageStatus = requireEl<HTMLElement>("#page-status");
 const reviewedCheckbox = requireEl<HTMLInputElement>("#reviewed-checkbox");
+const reviewedLabel = requireEl<HTMLElement>("#reviewed-label");
+const reviewHint = requireEl<HTMLElement>("#review-hint");
 const prevBtn = requireEl<HTMLButtonElement>("#prev");
 const nextBtn = requireEl<HTMLButtonElement>("#next");
 
@@ -137,8 +134,11 @@ async function startCompare(oldSrc: Source, newSrc: Source): Promise<void> {
     const pages = buildPageDiffs(oldPdf.pageTexts, newPdf.pageTexts);
     const changed = pages.filter((p) => p.status !== "unchanged").map((p) => p.index);
     const key = storageKey(oldSrc.name, oldSrc.size, newSrc.name, newSrc.size);
-    const stored = loadReviewed(key);
-    const reviewed = new Set([...stored].filter((i) => changed.includes(i)));
+    const stored = loadReview(key);
+    const reviewed: ReviewSets = {
+      text: new Set([...stored.text].filter((i) => changed.includes(i))),
+      visual: new Set([...stored.visual].filter((i) => changed.includes(i))),
+    };
 
     session = {
       oldPdf,
@@ -149,9 +149,9 @@ async function startCompare(oldSrc: Source, newSrc: Source): Promise<void> {
       reviewed,
       current: changed[0] ?? 0,
       mode: "text",
-      visualView: "side",
       canvasCache: new Map(),
-      diffCache: new Map(),
+      regionCache: new Map(),
+      visual: null,
     };
 
     loaderEl.hidden = true;
@@ -168,24 +168,26 @@ async function startCompare(oldSrc: Source, newSrc: Source): Promise<void> {
   }
 }
 
-// ---- Rendering --------------------------------------------------------------
+// ---- Progress & sidebar -----------------------------------------------------
 
 function renderProgress(): void {
   if (!session) {
     return;
   }
   const total = session.changed.length;
-  const done = session.changed.filter((i) => session?.reviewed.has(i)).length;
-  const pct = total === 0 ? 100 : Math.round((done / total) * 100);
+  const textDone = session.changed.filter((i) => session?.reviewed.text.has(i)).length;
+  const visualDone = session.changed.filter((i) => session?.reviewed.visual.has(i)).length;
+  const pct = total === 0 ? 100 : Math.round(((textDone + visualDone) / (total * 2)) * 100);
+
   progressBar.style.width = `${String(pct)}%`;
   if (total === 0) {
     progressText.textContent = "No changes found";
-  } else if (done === total) {
-    progressText.textContent = `All ${String(total)} changes reviewed ✓`;
+  } else if (textDone === total && visualDone === total) {
+    progressText.textContent = `All ${String(total)} changes reviewed (text & visual) ✓`;
   } else {
-    progressText.textContent = `Reviewed ${String(done)} of ${String(total)} changes`;
+    progressText.textContent = `Text ${String(textDone)}/${String(total)} · Visual ${String(visualDone)}/${String(total)} reviewed`;
   }
-  progressBar.classList.toggle("complete", total > 0 && done === total);
+  progressBar.classList.toggle("complete", total > 0 && textDone === total && visualDone === total);
 }
 
 function renderSidebar(): void {
@@ -194,25 +196,28 @@ function renderSidebar(): void {
   }
   sidebarEl.replaceChildren();
   for (const page of session.pages) {
+    const changed = page.status !== "unchanged";
     const item = document.createElement("button");
     item.type = "button";
     item.className = `page-item status-${page.status}`;
     if (page.index === session.current) {
       item.classList.add("current");
     }
-    if (session.reviewed.has(page.index)) {
-      item.classList.add("reviewed");
-    }
-    const check = session.reviewed.has(page.index) ? "✓ " : "";
+    const ticks = changed
+      ? `<span class="ticks"><span class="tick ${session.reviewed.text.has(page.index) ? "on" : ""}">T</span>` +
+        `<span class="tick ${session.reviewed.visual.has(page.index) ? "on" : ""}">V</span></span>`
+      : "";
     item.innerHTML =
-      `<span class="pi-label">${check}Page ${String(page.index + 1)}</span>` +
-      `<span class="pi-badge">${STATUS_LABEL[page.status]}</span>`;
+      `<span class="pi-label">Page ${String(page.index + 1)}</span>` +
+      `<span class="pi-meta"><span class="pi-badge">${STATUS_LABEL[page.status]}</span>${ticks}</span>`;
     item.addEventListener("click", () => {
       selectPage(page.index);
     });
     sidebarEl.appendChild(item);
   }
 }
+
+// ---- Page selection ---------------------------------------------------------
 
 function currentPage(): PageDiff | null {
   return session?.pages[session.current] ?? null;
@@ -232,31 +237,38 @@ function selectPage(index: number): void {
   pageStatus.textContent = STATUS_LABEL[page.status];
   pageStatus.className = `badge status-${page.status}`;
 
-  const isChanged = page.status !== "unchanged";
-  reviewedCheckbox.checked = session.reviewed.has(index);
-  reviewedCheckbox.disabled = !isChanged;
-
   for (const el of sidebarEl.querySelectorAll(".page-item")) {
     el.classList.remove("current");
   }
-  const active = sidebarEl.children[indexToChildPosition(index)];
+  const active = sidebarEl.children[index];
   if (active instanceof HTMLElement) {
     active.classList.add("current");
     active.scrollIntoView({ block: "nearest" });
   }
 
+  updateReviewControls();
   renderMain();
 }
 
-function indexToChildPosition(index: number): number {
-  // Sidebar lists every page in order, so the child position equals the index.
-  return index;
+function updateReviewControls(): void {
+  if (!session) {
+    return;
+  }
+  const page = currentPage();
+  const isChanged = page !== null && page.status !== "unchanged";
+  reviewedLabel.textContent = session.mode === "text" ? "Text reviewed" : "Visual reviewed";
+  reviewedCheckbox.checked = page !== null && session.reviewed[session.mode].has(page.index);
+  reviewedCheckbox.disabled = !isChanged;
+  reviewHint.textContent = "";
 }
+
+// ---- Main view --------------------------------------------------------------
 
 function renderMain(): void {
   if (!session) {
     return;
   }
+  session.visual = null;
   if (session.mode === "text") {
     renderTextMain();
   } else {
@@ -269,12 +281,12 @@ function renderTextMain(): void {
   if (!page) {
     return;
   }
+  viewerEl.className = "viewer";
   if (page.status === "unchanged") {
-    const text = page.newText ?? "";
     viewerEl.innerHTML = `<p class="note">No text changes on this page.</p><pre class="plain"></pre>`;
     const pre = viewerEl.querySelector(".plain");
     if (pre) {
-      pre.textContent = text;
+      pre.textContent = page.newText ?? "";
     }
     return;
   }
@@ -294,7 +306,7 @@ async function getCanvas(which: "old" | "new", index: number): Promise<HTMLCanva
   }
   const pdf = which === "old" ? session.oldPdf : session.newPdf;
   const canvas =
-    index < pdf.doc.numPages ? await renderPage(pdf.doc, index + 1, TARGET_WIDTH) : null;
+    index < pdf.doc.numPages ? await renderPage(pdf.doc, index + 1, RENDER_WIDTH) : null;
   session.canvasCache.set(cacheKey, canvas);
   return canvas;
 }
@@ -304,6 +316,7 @@ async function renderVisualMain(): Promise<void> {
     return;
   }
   const index = session.current;
+  viewerEl.className = "viewer";
   viewerEl.innerHTML = `<p class="note">Rendering pages…</p>`;
 
   const [oldCanvas, newCanvas] = await Promise.all([
@@ -316,37 +329,38 @@ async function renderVisualMain(): Promise<void> {
     return;
   }
 
-  if (session.visualView === "side") {
-    viewerEl.replaceChildren(pane("Original", oldCanvas), pane("Revised", newCanvas));
-    viewerEl.className = "viewer side";
-    return;
+  let regions = session.regionCache.get(index);
+  if (!regions) {
+    regions = computeDiffRegions(oldCanvas, newCanvas);
+    session.regionCache.set(index, regions);
   }
 
-  let diff = session.diffCache.get(index);
-  if (!diff) {
-    diff = computeVisualDiff(oldCanvas, newCanvas);
-    session.diffCache.set(index, diff);
-  }
-  const pctChanged = ((diff.changedPixels / diff.totalPixels) * 100).toFixed(2);
-  viewerEl.className = "viewer diff";
-  viewerEl.replaceChildren(pane(`Differences (${pctChanged}% of pixels)`, diff.canvas));
+  const controller = createVisual(
+    oldCanvas,
+    newCanvas,
+    regions.regions,
+    regions.width,
+    regions.height,
+    {
+      onRegionChange: (viewed, total) => {
+        updateVisualHint(viewed, total);
+      },
+    },
+  );
+  session.visual = controller;
+  viewerEl.replaceChildren(controller.root);
+  controller.fit();
+  controller.reveal();
 }
 
-function pane(label: string, canvas: HTMLCanvasElement | null): HTMLElement {
-  const wrap = document.createElement("figure");
-  wrap.className = "pane";
-  const caption = document.createElement("figcaption");
-  caption.textContent = label;
-  wrap.appendChild(caption);
-  if (canvas) {
-    wrap.appendChild(canvas);
-  } else {
-    const empty = document.createElement("div");
-    empty.className = "pane-empty";
-    empty.textContent = "(no such page)";
-    wrap.appendChild(empty);
+function updateVisualHint(viewed: number, total: number): void {
+  if (!session || session.mode !== "visual") {
+    return;
   }
-  return wrap;
+  const page = currentPage();
+  const allViewed = total > 0 && viewed === total;
+  const alreadyReviewed = page !== null && session.reviewed.visual.has(page.index);
+  reviewHint.textContent = allViewed && !alreadyReviewed ? "All diffs viewed — mark reviewed?" : "";
 }
 
 // ---- Navigation & review ----------------------------------------------------
@@ -388,13 +402,15 @@ function setReviewed(value: boolean): void {
   if (!page || page.status === "unchanged") {
     return;
   }
+  const set = session.reviewed[session.mode];
   if (value) {
-    session.reviewed.add(page.index);
+    set.add(page.index);
   } else {
-    session.reviewed.delete(page.index);
+    set.delete(page.index);
   }
-  saveReviewed(session.key, session.reviewed);
+  saveReview(session.key, session.reviewed);
   reviewedCheckbox.checked = value;
+  reviewHint.textContent = "";
   renderProgress();
   renderSidebar();
   if (value) {
@@ -402,27 +418,15 @@ function setReviewed(value: boolean): void {
   }
 }
 
-function setMode(mode: Mode): void {
+function setMode(mode: ReviewMode): void {
   if (!session) {
     return;
   }
   session.mode = mode;
   modeTextBtn.classList.toggle("active", mode === "text");
   modeVisualBtn.classList.toggle("active", mode === "visual");
-  visualViewsEl.hidden = mode !== "visual";
+  updateReviewControls();
   renderMain();
-}
-
-function setVisualView(view: VisualView): void {
-  if (!session) {
-    return;
-  }
-  session.visualView = view;
-  viewSideBtn.classList.toggle("active", view === "side");
-  viewDiffBtn.classList.toggle("active", view === "diff");
-  if (session.mode === "visual") {
-    renderMain();
-  }
 }
 
 function resetApp(): void {
@@ -485,12 +489,6 @@ modeTextBtn.addEventListener("click", () => {
 modeVisualBtn.addEventListener("click", () => {
   setMode("visual");
 });
-viewSideBtn.addEventListener("click", () => {
-  setVisualView("side");
-});
-viewDiffBtn.addEventListener("click", () => {
-  setVisualView("diff");
-});
 prevBtn.addEventListener("click", () => {
   goToNeighbor(-1);
 });
@@ -505,19 +503,34 @@ document.addEventListener("keydown", (event) => {
   if (!session || reviewEl.hidden) {
     return;
   }
+  const visual = session.mode === "visual" ? session.visual : null;
   switch (event.key) {
     case "ArrowRight":
-    case "j":
       goToNeighbor(1);
       break;
     case "ArrowLeft":
-    case "k":
       goToNeighbor(-1);
+      break;
+    case "]":
+      visual?.nextRegion();
+      break;
+    case "[":
+      visual?.prevRegion();
+      break;
+    case "+":
+    case "=":
+      visual?.zoomIn();
+      break;
+    case "-":
+      visual?.zoomOut();
+      break;
+    case "0":
+      visual?.fit();
       break;
     case "r": {
       const page = currentPage();
       if (page && page.status !== "unchanged") {
-        setReviewed(!session.reviewed.has(page.index));
+        setReviewed(!session.reviewed[session.mode].has(page.index));
       }
       break;
     }

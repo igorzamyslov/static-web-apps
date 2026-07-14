@@ -241,13 +241,38 @@ button {
   opacity: 0.5;
 }
 
-.page-item.reviewed .pi-label {
-  color: var(--added);
+.pi-meta {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
 }
 
 .pi-badge {
   font-size: 0.72rem;
   opacity: 0.75;
+}
+
+.ticks {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.tick {
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: color-mix(in srgb, CanvasText 45%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+
+.tick.on {
+  color: white;
+  background: var(--added);
+  border-color: var(--added);
 }
 
 /* ---- Page header ---- */
@@ -263,6 +288,11 @@ button {
 
 .page-title {
   font-weight: 600;
+}
+
+.review-hint {
+  font-size: 0.8rem;
+  color: var(--accent);
 }
 
 .badge {
@@ -305,45 +335,120 @@ button {
   border-radius: 10px;
 }
 
-.viewer.side {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+/* ---- Visual mode ---- */
+
+.visual {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.visual-controls {
+  display: flex;
+  flex-wrap: wrap;
   gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
 }
 
-@media (width <= 720px) {
-  .viewer.side {
-    grid-template-columns: 1fr;
-  }
+.ctrl-group {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
 }
 
-.pane {
+.ctrl-btn {
+  min-width: 2rem;
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+  background: Canvas;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.ctrl-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.ctrl-label {
+  min-width: 3.5rem;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.region-label {
+  min-width: 12rem;
+}
+
+.visual-scroll {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  max-height: 72vh;
+  padding: 0.5rem;
+  overflow: auto;
+  background: color-mix(in srgb, Canvas 86%, CanvasText);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.vpage {
   margin: 0;
 }
 
-.pane figcaption {
+.vpage figcaption {
   margin-bottom: 0.4rem;
   font-size: 0.8rem;
   font-weight: 600;
+  text-align: center;
   opacity: 0.75;
 }
 
-.pane canvas {
-  width: 100%;
-  height: auto;
+.canvas-box {
+  position: relative;
   background: white;
   border: 1px solid var(--line);
-  border-radius: 4px;
 }
 
-.pane-empty {
+.canvas-box.empty {
   display: grid;
   place-items: center;
-  height: 200px;
+  width: 320px;
+  height: 420px;
   color: CanvasText;
-  background: color-mix(in srgb, Canvas 85%, CanvasText);
-  border-radius: 4px;
+  background: color-mix(in srgb, Canvas 78%, CanvasText);
   opacity: 0.6;
+}
+
+.vcanvas {
+  display: block;
+}
+
+.region-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.region {
+  position: absolute;
+  cursor: pointer;
+  pointer-events: auto;
+  background: color-mix(in srgb, var(--changed) 12%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--changed) 70%, transparent);
+  border-radius: 2px;
+}
+
+.region.viewed {
+  background: transparent;
+  border-color: color-mix(in srgb, CanvasText 35%, transparent);
+}
+
+.region.active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 .text-diff {
