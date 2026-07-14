@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PDF Diff Review</title>
-    <script type="module" crossorigin src="./assets/index-BmAuJPth.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-DbkRZPF2.css">
+    <script type="module" crossorigin src="./assets/index-T1GurXhj.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BtyShFfe.css">
   </head>
   <body>
     <main id="app">
@@ -45,10 +45,6 @@
             <button type="button" id="mode-text" class="seg active">Text</button>
             <button type="button" id="mode-visual" class="seg">Visual</button>
           </div>
-          <div class="visual-views" id="visual-views" role="group" aria-label="Visual view" hidden>
-            <button type="button" id="view-side" class="seg active">Side by side</button>
-            <button type="button" id="view-diff" class="seg">Difference</button>
-          </div>
           <button type="button" id="reset" class="link">Start over</button>
         </div>
 
@@ -59,10 +55,11 @@
               <div class="page-header-left">
                 <span id="page-title" class="page-title"></span>
                 <span id="page-status" class="badge"></span>
+                <span id="review-hint" class="review-hint"></span>
               </div>
               <label class="reviewed-toggle">
                 <input type="checkbox" id="reviewed-checkbox" />
-                <span>Reviewed</span>
+                <span id="reviewed-label">Text reviewed</span>
               </label>
             </div>
             <div id="viewer" class="viewer"></div>
