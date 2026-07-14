@@ -37,7 +37,7 @@ jobs:
           fetch-depth: 0 # full history so we can diff against the previous commit
 
       - name: Setup Node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
 
