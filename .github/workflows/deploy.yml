@@ -117,6 +117,8 @@ jobs:
             mkdir -p "$SITE"
             git -C "$SITE" init -q
             git -C "$SITE" checkout -q -b gh-pages
+            git -C "$SITE" remote add origin \
+              "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           fi
 
           # Replace only the apps that changed; everything else stays as published.
