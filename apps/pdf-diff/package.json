@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "diff": "^7.0.0",
+    "diff": "^9.0.0",
     "pdfjs-dist": "^4.7.0"
   },
   "devDependencies": {
