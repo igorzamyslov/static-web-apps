@@ -4,9 +4,17 @@ import globals from "globals";
 import prettier from "eslint-config-prettier";
 
 export default tseslint.config(
-  // Never lint build output or dependencies.
+  // Never lint build output or dependencies. apps/insert-generator is a submodule
+  // that lints itself.
   {
-    ignores: ["**/dist/**", "**/node_modules/**", "_build/**", "_site/**", "**/*.min.js"],
+    ignores: [
+      "**/dist/**",
+      "**/node_modules/**",
+      "_build/**",
+      "_site/**",
+      "**/*.min.js",
+      "apps/insert-generator/**",
+    ],
   },
 
   // Baseline: recommended JS + strict TypeScript (non-type-checked, so the

@@ -1,0 +1,3 @@
+[submodule "apps/insert-generator"]
+	path = apps/insert-generator
+	url = https://github.com/igorzamyslov/boardgame-insert-generator.git

@@ -12,7 +12,30 @@ Each app lives in `apps/<name>/` and is served at `…/<name>/`. Two kinds:
 - **Built** — [`markdown-preview`](apps/markdown-preview/): has a `package.json`;
   `npm run build` outputs `dist/`. Example uses Vite + TypeScript + `marked`.
 
+- **Submodule** — [`insert-generator`](apps/insert-generator/): lives in its own
+  repo, [igorzamyslov/boardgame-insert-generator](https://github.com/igorzamyslov/boardgame-insert-generator),
+  and is mounted here as a git submodule. It builds like any other built app.
+
 Apps are self-contained — develop, build, and run each on its own.
+
+### Submodule apps
+
+A submodule app keeps its own history, CI and lint/format setup; root lint and
+format skip it. Clone with the apps included:
+
+```bash
+git clone --recurse-submodules https://github.com/igorzamyslov/static-web-apps.git
+# already cloned? git submodule update --init
+```
+
+To publish a new version of the app, pull it in the submodule and commit the
+new pointer:
+
+```bash
+git -C apps/insert-generator pull
+git add apps/insert-generator
+git commit -m "Update insert-generator"
+```
 
 ## Quick start
 

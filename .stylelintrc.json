@@ -1,6 +1,12 @@
 {
   "extends": ["stylelint-config-standard"],
-  "ignoreFiles": ["**/dist/**", "**/node_modules/**", "_build/**", "_site/**"],
+  "ignoreFiles": [
+    "**/dist/**",
+    "**/node_modules/**",
+    "_build/**",
+    "_site/**",
+    "apps/insert-generator/**"
+  ],
   "rules": {
     "value-keyword-case": [
       "lower",
